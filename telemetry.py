@@ -17,8 +17,10 @@ pressureA = []
 altitudeA = []
 temperatureA = []
 
-arduinoData = serial.Serial('/dev/cu.usbmodem14101', 115200) #connectiing to input device and baud
-plt.ion()                #interactive mode
+#connecting to input device and baud [change if not using my laptop]
+arduinoData = serial.Serial('/dev/cu.usbmodem14101', 115200) 
+#interactive mode
+plt.ion()
 
 thetaI = (np.pi/2)
 count = 0
@@ -164,10 +166,3 @@ while True: #loops forever
     
     #prevents crash -----------------------------------------------------------
     plt.pause(.001) 
-    
-    
-
-        
-        
-    
-    
