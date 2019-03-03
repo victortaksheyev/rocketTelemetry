@@ -85,6 +85,6 @@ void printIMUData(void)
   serial.println(temp); 
 
 
-  delay(10);
+  delay(500);
 }
 
