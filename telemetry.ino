@@ -1,16 +1,28 @@
-
 #include <SparkFunMPU9250-DMP.h>
 #include "SparkFunBME280.h"
 #include <Wire.h> //allows you to communicate with I2C devices
 
 #define serial SerialUSB
+#include <Servo.h> // servo
+
+int count = 0;
+int seconds = 0;
+double maxAlt = 0;
+double minAlt = 10000;
 
 MPU9250_DMP imu;
 BME280 mySensor;
+Servo myservo;
 
+const int servo_pin = 11;
+bool deployed = false;
+const int start_angle = 0;
 
 void setup() 
 {
+  
+  myservo.attach(servo_pin);
+  myservo.write(start_angle);
   Serial.begin(115200);
   Wire.begin();
 
@@ -39,17 +51,52 @@ void setup()
   imu.setSampleRate(10); // Set sample rate to 10Hz
 }
 
-void loop() 
-{
-  if ( imu.dataReady() )
-  {
+void loop() {
+  double alt;
+  double accelz;
+  double accely;
+  double gyroz;
+  
+  
+  if ( imu.dataReady() ) {
     imu.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
-    printIMUData();
+    printIMUData(alt);
+    serial.println(alt);
+//    serial.print("\t");
+//    serial.println(accelz);
+////    serial.print("\t");
+////    serial.print(accely);
+////    serial.print("\t");
+//    serial.println(gyroz);
+//    smallestAlt(alt, minAlt); 
+//    largestAlt(alt, maxAlt);
+
+    
+    if (alt < 2085) {
+        for(int angle = 0; angle<=300; angle+=5) {   // command to move from 180 degrees to 0 degrees                             
+          myservo.write(angle);                      //command to rotate the servo to the specified angle
+          delay(50);
+          deployed = true;               
+        }
+        // stop 
+        if (deployed == true) {
+          delay(15000);
+          myservo.write(start_angle);
+          stop();
+        }
+    }
   }
 }
 
-void printIMUData(void)
+void stop()
+{
+ while(1);
+}
+
+
+void printIMUData(double& alt)
 {  
+  count++;
   float accelX = imu.calcAccel(imu.ax);
   float accelY = imu.calcAccel(imu.ay);
   float accelZ = imu.calcAccel(imu.az);
@@ -63,28 +110,64 @@ void printIMUData(void)
   float pressure = mySensor.readFloatPressure();
   float altitude = mySensor.readFloatAltitudeFeet();
   float temp = mySensor.readTempF();
+  alt = altitude;
+//  accelz = accelZ;
+//  gyroz = gyroZ;
+//  accely = accelY;
   
-  serial.print(accelX);
-  serial.print(",");
-  serial.print(accelY);
-  serial.print(",");
-  serial.print(accelZ);
-  serial.print(",");
-  serial.print(gyroX);
-  serial.print(",");
-  serial.print(gyroY);
-  serial.print(",");
-  serial.print(gyroZ);
-  serial.print(",");
-  serial.print(humidity);
-  serial.print(","); 
-  serial.print(pressure);
-  serial.print(","); 
-  serial.print(altitude);
-  serial.print(","); 
-  serial.println(temp); 
+  
+//  serial.print(accelX);
+//  serial.print(",");
+//  serial.print(accelY);
+//  serial.print(",");
+//  serial.print(accelZ);
+//  serial.print(",");
+//  serial.print(gyroX);
+//  serial.print(",");
+//  serial.print(gyroY);
+//  serial.print(",");
+//  serial.print(gyroZ);
+//  serial.print(",");
+//  serial.print(humidity);
+//  serial.print(","); 
+//  serial.print(pressure);
+//  serial.print(","); 
+//  serial.print(altitude);
+//  serial.print(","); 
+//  serial.println(temp); 
+  if (count==10) {             // if time == 1 second (because 100 milliseconds * 10 = 1s) || change this if delay for sensors changes
+//    serial.print(seconds);
+    seconds++;
+    count = 0;
+  }
 
-
-  delay(500);
+//  if (seconds == 10) {
+//    serial.print("smallest altitude: ");
+//    serial.println(minAlt);
+//  }
+  
+  delay(100);
 }
+
+void altChange() {
+  
+}
+
+// calculates the smallest altitude
+void smallestAlt(double alt, double& maxAlt) {
+    if(alt<minAlt) {
+    minAlt = alt;
+   }
+}
+
+void largestAlt(double alt, double& maxAlt) {
+   if(alt<maxAlt) {
+    maxAlt = alt;
+   }
+//   serial.print(alt);
+//   serial.print("\t");
+//   serial.println(maxAlt);
+}
+
+
 
