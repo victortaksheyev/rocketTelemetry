@@ -5,6 +5,30 @@
 #define serial SerialUSB
 #include <Servo.h> // servo
 
+// creates internal clock
+class Time {
+    int count;
+  public:
+    int seconds;
+    const int delay = 100;  // must be a number < 100
+    Time();             // constuctor
+    void printSecs();
+    void incrementCount() {count+=1;} // increments count
+};
+
+Time::Time() {
+  count = 0;
+  seconds = 0;
+}
+
+void Time::printSecs() {
+  if (count == 10) {
+    seconds++;
+    serial.println(seconds);
+    count = 0;
+   }
+}
+
 int count = 0;
 int seconds = 0;
 double maxAlt = 0;
@@ -13,6 +37,7 @@ double minAlt = 10000;
 MPU9250_DMP imu;
 BME280 mySensor;
 Servo myservo;
+Time mainClock;
 
 const int servo_pin = 11;
 bool deployed = false;
@@ -61,7 +86,7 @@ void loop() {
   if ( imu.dataReady() ) {
     imu.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
     printIMUData(alt);
-    serial.println(alt);
+//    serial.println(alt);
 //    serial.print("\t");
 //    serial.println(accelz);
 ////    serial.print("\t");
@@ -71,20 +96,20 @@ void loop() {
 //    smallestAlt(alt, minAlt); 
 //    largestAlt(alt, maxAlt);
 
-    
-    if (alt < 2085) {
-        for(int angle = 0; angle<=300; angle+=5) {   // command to move from 180 degrees to 0 degrees                             
-          myservo.write(angle);                      //command to rotate the servo to the specified angle
-          delay(50);
-          deployed = true;               
-        }
-        // stop 
-        if (deployed == true) {
-          delay(15000);
-          myservo.write(start_angle);
-          stop();
-        }
-    }
+//    
+//    if (alt < 2000) {
+//        for(int angle = 0; angle<=300; angle+=5) {   // command to move from 180 degrees to 0 degrees                             
+//          myservo.write(angle);                      //command to rotate the servo to the specified angle
+//          delay(50);
+//          deployed = true;               
+//        }
+//        // stop 
+//        if (deployed == true) {
+//          delay(15000);
+//          myservo.write(start_angle);
+//          stop();
+//        }
+//    }
   }
 }
 
@@ -96,7 +121,11 @@ void stop()
 
 void printIMUData(double& alt)
 {  
-  count++;
+  mainClock.incrementCount();
+  mainClock.printSecs();
+  
+//  serial.print(mainClock.seconds);
+  
   float accelX = imu.calcAccel(imu.ax);
   float accelY = imu.calcAccel(imu.ay);
   float accelZ = imu.calcAccel(imu.az);
@@ -110,7 +139,7 @@ void printIMUData(double& alt)
   float pressure = mySensor.readFloatPressure();
   float altitude = mySensor.readFloatAltitudeFeet();
   float temp = mySensor.readTempF();
-  alt = altitude;
+//  alt = altitude;
 //  accelz = accelZ;
 //  gyroz = gyroZ;
 //  accely = accelY;
@@ -135,18 +164,13 @@ void printIMUData(double& alt)
 //  serial.print(altitude);
 //  serial.print(","); 
 //  serial.println(temp); 
-  if (count==10) {             // if time == 1 second (because 100 milliseconds * 10 = 1s) || change this if delay for sensors changes
-//    serial.print(seconds);
-    seconds++;
-    count = 0;
-  }
 
 //  if (seconds == 10) {
 //    serial.print("smallest altitude: ");
 //    serial.println(minAlt);
 //  }
   
-  delay(100);
+  delay(mainClock.delay);    // uses the dalay preset in the time
 }
 
 void altChange() {
@@ -168,6 +192,8 @@ void largestAlt(double alt, double& maxAlt) {
 //   serial.print("\t");
 //   serial.println(maxAlt);
 }
+
+
 
 
 
