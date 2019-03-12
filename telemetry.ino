@@ -7,8 +7,8 @@
 
 // creates internal clock
 class Time {
-    int count;
   public:
+    int count;
     int seconds;
     const int delay = 100;  // must be a number < 100
     Time();             // constuctor
@@ -18,7 +18,7 @@ class Time {
 
 Time::Time() {
   count = 0;
-  seconds = 0;
+  seconds = 1;
 }
 
 void Time::printSecs() {
@@ -31,8 +31,8 @@ void Time::printSecs() {
 
 int count = 0;
 int seconds = 0;
-double maxAlt = 0;
-double minAlt = 10000;
+
+bool initCall = false;
 
 MPU9250_DMP imu;
 BME280 mySensor;
@@ -45,7 +45,6 @@ const int start_angle = 0;
 
 void setup() 
 {
-  
   myservo.attach(servo_pin);
   myservo.write(start_angle);
   Serial.begin(115200);
@@ -111,7 +110,35 @@ void loop() {
 //        }
 //    }
   }
+
+  int initCallTime;
+  // initial altitude over certain time interval
+  if (mainClock.seconds % 5 == 0 && initCall == false) {
+    initAlt();
+    initCallTime = mainClock.seconds;   // stores time when initial altitude was measured 
+    serial.print("CALLED AT ");
+    serial.print(initCallTime);
+    initCall = true;
+  }
+
+  if (mainClock.seconds == 10 && initCall == true) {
+    finalAlt();
+    initCall = false;   // resets var so that initAlt can be called again. 
+  }
+
 }
+
+void initAlt() {
+
+      serial.print("INITIAL height sample");
+    initCall = true;
+  }
+  
+
+  void finalAlt() {
+        serial.print("FINAL height sample");
+    initCall = false;
+    }
 
 void stop()
 {
@@ -173,27 +200,8 @@ void printIMUData(double& alt)
   delay(mainClock.delay);    // uses the dalay preset in the time
 }
 
-void altChange() {
-  
+void altChange(float alt) {
+    
 }
 
 // calculates the smallest altitude
-void smallestAlt(double alt, double& maxAlt) {
-    if(alt<minAlt) {
-    minAlt = alt;
-   }
-}
-
-void largestAlt(double alt, double& maxAlt) {
-   if(alt<maxAlt) {
-    maxAlt = alt;
-   }
-//   serial.print(alt);
-//   serial.print("\t");
-//   serial.println(maxAlt);
-}
-
-
-
-
-
