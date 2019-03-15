@@ -11,9 +11,9 @@ class Time {
     int count;
     int seconds;
     const int delay = 100;  // must be a number < 100
-    Time();             // constuctor
+    Time();
     void printSecs();
-    void incrementCount() {count+=1;} // increments count
+    void incrementSecs();
 };
 
 Time::Time() {
@@ -21,66 +21,70 @@ Time::Time() {
   seconds = 1;
 }
 
-void Time::printSecs() {
+void Time::incrementSecs() {
+  count+=1;
   if (count == 10) {
     seconds++;
-    serial.println(seconds);
+    serial.println(seconds);            // prints out secs
     count = 0;
    }
 }
 
-int count = 0;
-int seconds = 0;
+int callTime = 0;                       // stores time when alt is sampled
+float initAlt;                          // stores init alt sample of interval
+float finalAlt;                         // stores final alt sample of interval
 
-bool initCall = false;
+bool initCall = false;                  // stores if alt is initially sampled
+bool enable = false;                    // enables rocket to inflate payload (will only occur if Δalt > certain const)
+                                        // talk with propulsion about the const
+bool inflated = false;                  // stores inflation status of payload
+                                          
+MPU9250_DMP imu;                        // creates imu sensor object
+BME280 mySensor;                        // creates altimeter sensor object
+Servo myservo;                          // creates servo object
+Time mainClock;                         // creates main clock/time that rocket runs on
+    
+const int servo_pin = 11;               // output to the servo
 
-MPU9250_DMP imu;
-BME280 mySensor;
-Servo myservo;
-Time mainClock;
-
-const int servo_pin = 11;
-bool deployed = false;
 const int start_angle = 0;
 
-void setup() 
-{
+void setup() {
   myservo.attach(servo_pin);
   myservo.write(start_angle);
   Serial.begin(115200);
   Wire.begin();
-
- if (mySensor.beginI2C() == false) //Begin communication over I2C
-  {
+  
+ if (mySensor.beginI2C() == false) {    // Begin communication over I2C 
     Serial.println("The sensor did not respond. Please check wiring.");
     while(1); //Freeze
   }
-  if (imu.begin() != INV_SUCCESS)
-  {
-    while (1)
-    {
+  if (imu.begin() != INV_SUCCESS) {
+    while (1) {
       serial.println("Unable to communicate with MPU-9250");
       serial.println("Check connections, and try again.");
       serial.println();
       delay(5000);
     }
   }
+  
   imu.setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
   // Gyro options are +/- 250, 500, 1000, or 2000 dps
-  imu.setGyroFSR(2000); // Set gyro to 2000 dps
-  imu.setAccelFSR(16); // Set accel to full range
+  imu.setGyroFSR(2000);   // Set gyro to 2000 dps
+  imu.setAccelFSR(16);    // Set accel to full range
 
-  imu.setLPF(5); // Set LPF corner frequency to 5Hz
-
-  imu.setSampleRate(10); // Set sample rate to 10Hz
+  imu.setLPF(5);          // Set LPF corner frequency to 5Hz
+  imu.setSampleRate(10);  // Set sample rate to 10Hz
 }
+
+// ----------------------------------------------------------- END OF SETUP -----------------------------------------------------------
+
+// ----------------------------------------------------------- START OF LOOP ----------------------------------------------------------
 
 void loop() {
   double alt;
   double accelz;
   double accely;
   double gyroz;
-  
   
   if ( imu.dataReady() ) {
     imu.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
@@ -94,64 +98,50 @@ void loop() {
 //    serial.println(gyroz);
 //    smallestAlt(alt, minAlt); 
 //    largestAlt(alt, maxAlt);
-
-//    
-//    if (alt < 2000) {
-//        for(int angle = 0; angle<=300; angle+=5) {   // command to move from 180 degrees to 0 degrees                             
-//          myservo.write(angle);                      //command to rotate the servo to the specified angle
-//          delay(50);
-//          deployed = true;               
-//        }
-//        // stop 
-//        if (deployed == true) {
-//          delay(15000);
-//          myservo.write(start_angle);
-//          stop();
-//        }
-//    }
   }
 
-  int initCallTime;
-  // initial altitude over certain time interval
   if (mainClock.seconds % 5 == 0 && initCall == false) {
-    initAlt();
-    initCallTime = mainClock.seconds;   // stores time when initial altitude was measured 
-    serial.print("CALLED AT ");
-    serial.print(initCallTime);
-    initCall = true;
-  }
-
-  if (mainClock.seconds == 10 && initCall == true) {
-    finalAlt();
-    initCall = false;   // resets var so that initAlt can be called again. 
-  }
-
-}
-
-void initAlt() {
-
-      serial.print("INITIAL height sample");
-    initCall = true;
-  }
-  
-
-  void finalAlt() {
-        serial.print("FINAL height sample");
-    initCall = false;
+    serial.println("1st if");
+    callTime = mainClock.seconds;
+    initAlt = mySensor.readFloatAltitudeFeet();           // samples alt, storing it as initial alt
+    initCall = true;                                      // declaring that initial height has been sampled so it doesnt repeat
     }
 
-void stop()
-{
- while(1);
+  if (mainClock.seconds == (callTime + 5) && initCall == true) {
+    serial.println("2nd if");
+    finalAlt = mySensor.readFloatAltitudeFeet();          // samples alt, storing it as final alt
+    serial.print("Change in altitude: ");
+    
+    // verifies that the rocket has taken off (has been in the air)
+    if (altChange(initAlt, finalAlt) > 100) {
+      enable = true;
+    }
+
+    // call the servo to open the valve
+    if (altChange(initAlt, finalAlt) < 2 && enable) {
+      for(int angle = 0; angle <= 300; angle += 5) {      // command to move from 180 degrees to 0 degrees                             
+          myservo.write(angle);                           //command to rotate the servo to the specified angle
+          delay(50);
+          inflated = true;               
+        }
+        if (inflated == true) {
+          delay(15000);                                   // after 15 seconds, will rotate the valve back, closing the C02
+          myservo.write(start_angle);
+          stop();                                         // ends entire program
+        }
+    }
+    initCall = false;
+   }
+    
 }
 
+// ----------------------------------------------------------- END OF LOOP ----------------------------------------------------------
 
-void printIMUData(double& alt)
-{  
-  mainClock.incrementCount();
-  mainClock.printSecs();
-  
-//  serial.print(mainClock.seconds);
+// ----------------------------------------------------------- FUNCTION DEFs --------------------------------------------------------
+
+// initializes main rocket clock, samples and prints sensor data, every DELAY amount
+void printIMUData(double& alt) {  
+  mainClock.incrementSecs();
   
   float accelX = imu.calcAccel(imu.ax);
   float accelY = imu.calcAccel(imu.ay);
@@ -167,11 +157,7 @@ void printIMUData(double& alt)
   float altitude = mySensor.readFloatAltitudeFeet();
   float temp = mySensor.readTempF();
 //  alt = altitude;
-//  accelz = accelZ;
-//  gyroz = gyroZ;
-//  accely = accelY;
-  
-  
+
 //  serial.print(accelX);
 //  serial.print(",");
 //  serial.print(accelY);
@@ -191,17 +177,21 @@ void printIMUData(double& alt)
 //  serial.print(altitude);
 //  serial.print(","); 
 //  serial.println(temp); 
-
-//  if (seconds == 10) {
-//    serial.print("smallest altitude: ");
-//    serial.println(minAlt);
-//  }
   
   delay(mainClock.delay);    // uses the dalay preset in the time
 }
 
-void altChange(float alt) {
-    
+// calculates and returns difference between initial and final altitudes
+float altChange(float initAlt, float finalAlt) {
+//    serial.println(abs(finalAlt-initAlt));
+    return abs(finalAlt-initAlt);
 }
 
-// calculates the smallest altitude
+// acts as a permanent end to the program
+// only call when program needs to be ended entirely
+void stop()
+{
+ while(1);                  // calls an infinite loop
+}
+
+// ----------------------------------------------------------- END FUNCTION DEFs -----------------------------------------------------
