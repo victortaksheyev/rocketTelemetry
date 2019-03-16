@@ -45,14 +45,20 @@ Servo myservo;                          // creates servo object
 Time mainClock;                         // creates main clock/time that rocket runs on
     
 const int servo_pin = 11;               // output to the servo
+const int led_pin = 10;
 
 const int start_angle = 0;
 
+const int sampleTime = 1;
+
+// configuring the sensor and pins
 void setup() {
   myservo.attach(servo_pin);
   myservo.write(start_angle);
   Serial.begin(115200);
   Wire.begin();
+
+//  pinMode(led_pin, OUTPUT);
   
  if (mySensor.beginI2C() == false) {    // Begin communication over I2C 
     Serial.println("The sensor did not respond. Please check wiring.");
@@ -100,30 +106,31 @@ void loop() {
 //    largestAlt(alt, maxAlt);
   }
 
-  if (mainClock.seconds % 5 == 0 && initCall == false) {
-    serial.println("1st if");
+  if (mainClock.seconds % sampleTime == 0 && initCall == false) {
     callTime = mainClock.seconds;
     initAlt = mySensor.readFloatAltitudeFeet();           // samples alt, storing it as initial alt
     initCall = true;                                      // declaring that initial height has been sampled so it doesnt repeat
     }
 
-  if (mainClock.seconds == (callTime + 5) && initCall == true) {
-    serial.println("2nd if");
+  if (mainClock.seconds == (callTime + sampleTime) && initCall == true) {
     finalAlt = mySensor.readFloatAltitudeFeet();          // samples alt, storing it as final alt
     serial.print("Change in altitude: ");
+    altChange(initAlt, finalAlt);
     
-    // verifies that the rocket has taken off (has been in the air)
-    if (altChange(initAlt, finalAlt) > 100) {
+//    // verifies that the rocket has taken off (has been in the air)
+    if (altChange(initAlt, finalAlt) > 10) {
       enable = true;
     }
 
-    // call the servo to open the valve
+//     // call the servo to open the valve
     if (altChange(initAlt, finalAlt) < 2 && enable) {
-      for(int angle = 0; angle <= 300; angle += 5) {      // command to move from 180 degrees to 0 degrees                             
+      for(int angle = 0; angle <= 350; angle += 5) {      // command to move from 180 degrees to 0 degrees                             
           myservo.write(angle);                           //command to rotate the servo to the specified angle
           delay(50);
           inflated = true;               
         }
+//      digitalWrite(led_pin, HIGH);
+//      inflated == true;
         if (inflated == true) {
           delay(15000);                                   // after 15 seconds, will rotate the valve back, closing the C02
           myservo.write(start_angle);
@@ -156,19 +163,18 @@ void printIMUData(double& alt) {
   float pressure = mySensor.readFloatPressure();
   float altitude = mySensor.readFloatAltitudeFeet();
   float temp = mySensor.readTempF();
-//  alt = altitude;
 
 //  serial.print(accelX);
 //  serial.print(",");
 //  serial.print(accelY);
 //  serial.print(",");
-//  serial.print(accelZ);
+//  serial.println(accelZ);
 //  serial.print(",");
 //  serial.print(gyroX);
 //  serial.print(",");
 //  serial.print(gyroY);
 //  serial.print(",");
-//  serial.print(gyroZ);
+//  serial.println(gyroZ);
 //  serial.print(",");
 //  serial.print(humidity);
 //  serial.print(","); 
@@ -183,7 +189,7 @@ void printIMUData(double& alt) {
 
 // calculates and returns difference between initial and final altitudes
 float altChange(float initAlt, float finalAlt) {
-//    serial.println(abs(finalAlt-initAlt));
+    serial.println(abs(finalAlt-initAlt));
     return abs(finalAlt-initAlt);
 }
 
@@ -195,3 +201,4 @@ void stop()
 }
 
 // ----------------------------------------------------------- END FUNCTION DEFs -----------------------------------------------------
+
