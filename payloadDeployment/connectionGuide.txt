@@ -1,0 +1,6 @@
+Connection to the MPL3115A2 board
+
+// Connect  3.3 to 3vo
+//          gnd to gnd
+//          SCL to SCL
+//          SDA to SDA
