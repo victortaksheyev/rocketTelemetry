@@ -14,17 +14,19 @@ Adafruit_MPL3115A2 baro = Adafruit_MPL3115A2();
 float initH = 0;
 float maxH = 0;
 bool firstRun = true;
-const int minDeploymentH = 800;                                   // feet
+const int minDeploymentH = 850;                                   // feet
 const int maxDeploymentH = 1000;                                  // feet
 float prevAlt = -1;
 float currAlt;
 bool noseConeDeployed = true;
+const int enableLED = 6;
 const int led = 5;
 const int redundantLED = 4;
 int seconds = 0;
 bool initCall = false;
 const int sampleTime = 1;                                         // performing redundant check algo every second
 int callTime = 0;
+
 
 float initAlt;
 float finalAlt;
@@ -69,6 +71,7 @@ float altChange(float initAlt, float finalAlt);
 void setup() {
   Serial.begin(9600);
   pinMode(led, OUTPUT);
+  pinMode(enableLED, OUTPUT);
   pinMode(redundantLED, OUTPUT);
 }
  
@@ -89,13 +92,13 @@ void loop() {
 
   getMax(currAlt, maxH);
 
-  // if this occurs we're good - go into the infinite loop
-//  if ( decreasingH(currAlt, prevAlt) && inDeployRange(currAlt, maxDeploymentH, minDeploymentH) && currAlt < maxH) {
-//    Serial.println("------------- DEPLOYED (via main system) ----------------");
-//    digitalWrite(led, HIGH);
+//   if this occurs we're good - go into the infinite loop
+  if ( decreasingH(currAlt, prevAlt) && inDeployRange(currAlt, maxDeploymentH, minDeploymentH) && currAlt < maxH) {
+    Serial.println("------------- DEPLOYED (via main system) ----------------");
+    digitalWrite(led, HIGH);
 //    delay(5000);                // send current for 5 seconds
 //    while(1); 
-//  }
+  }
 
   // redundant system
   if (clock.seconds % sampleTime == 0 && initCall == false) {
@@ -114,12 +117,13 @@ void loop() {
     Serial.print("Change in altitude: "); Serial.println(altChange(initAlt, finalAlt));
     
     // verifies that the rocket has taken off (has been in the air)
-    if (altChange(initAlt, finalAlt) > 20) {        // this is a little sketchy because this is saying the change in altitude could be negative or positive, but I think it's fine
+    if (altChange(initAlt, finalAlt) > 50) {        // this is a little sketchy because this is saying the change in altitude could be negative or positive, but I think it's fine
       enable = true;
+      digitalWrite(enableLED, HIGH);   
       Serial.println("Enabled!!!");
     }
 
-    if ( currAlt < maxDeploymentH && decreasingH(currAlt, prevAlt) && enable) {
+    if ( currAlt < minDeploymentH && currAlt < maxH && enable && decreasingH(currAlt, prevAlt)) {
       digitalWrite(redundantLED, HIGH);                                                      // send out a current to ignite nichrome
       delay(5000);                                                                  // for 5 seconds
       Serial.println("------------- DEPLOYED (via redundant system) ----------------");
@@ -127,7 +131,6 @@ void loop() {
     }
     initCall = false;
   }
-
 
     delay(250);
     clock.incrementSecs();         // checks and increments count, increments seconds after 4 incremenets of count
