@@ -163,26 +163,6 @@ void printIMUData(double& alt) {
   float pressure = mySensor.readFloatPressure();
   float altitude = mySensor.readFloatAltitudeFeet();
   float temp = mySensor.readTempF();
-
-//  serial.print(accelX);
-//  serial.print(",");
-//  serial.print(accelY);
-//  serial.print(",");
-//  serial.println(accelZ);
-//  serial.print(",");
-//  serial.print(gyroX);
-//  serial.print(",");
-//  serial.print(gyroY);
-//  serial.print(",");
-//  serial.println(gyroZ);
-//  serial.print(",");
-//  serial.print(humidity);
-//  serial.print(","); 
-//  serial.print(pressure);
-//  serial.print(","); 
-//  serial.print(altitude);
-//  serial.print(","); 
-//  serial.println(temp); 
   
   delay(mainClock.delay);    // uses the dalay preset in the time
 }
