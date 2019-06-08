@@ -43,7 +43,8 @@ MPU9250_DMP imu;                        // creates imu sensor object
 BME280 mySensor;                        // creates altimeter sensor object
 Servo myservo;                          // creates servo object
 Time mainClock;                         // creates main clock/time that rocket runs on
-    
+
+const int red_led = 10;
 const int servo_pin = 11;               // output to the servo
 const int start_angle = 0;
 const int sampleTime = 1;
@@ -107,15 +108,21 @@ void loop() {
     if (altChange(initAlt, finalAlt) > 50) {                  // verifies that the rocket has taken off (has been in the air)
       enable = true;
     }
-   
+    int totalAngle = 0;
     if (altChange(initAlt, finalAlt) < 2 && enable) {         // open valve
       for(int angle = 0; angle <= 350; angle += 5) {                 
           myservo.write(angle);                     
           delay(50);
+          totalAngle += 5;
           inflated = true;               
         }
-        delay(7500);                                          // wait 7.5s
-        myservo.write(start_angle);                           // close Valve
+        delay(7500);
+       for (int angle = totalAngle; angle >= 0; angle -= 5) {
+          myservo.write(angle);
+          delay(50);
+       }
+                                                  // wait 7.5s
+//        myservo.write(start_angle);                           // close Valve
         stop();                                               // end 
     }
     
