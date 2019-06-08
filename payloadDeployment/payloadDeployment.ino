@@ -15,7 +15,7 @@ float initH = 0;
 float maxH = 0;
 bool firstRun = true;
 const int minDeploymentH = 850;                                   // feet
-const int maxDeploymentH = 1000;                                  // feet
+const int maxDeploymentH = 1000;                                  // feet maybe change this to 1100
 float prevAlt = -1;
 float currAlt;
 bool noseConeDeployed = true;
@@ -92,15 +92,19 @@ void loop() {
 
   getMax(currAlt, maxH);
 
-//   if this occurs we're good - go into the infinite loop
+//  ------------------------------------------------------------------ MAIN SYSTEM ---------------------------------------------------------------------
   if ( decreasingH(currAlt, prevAlt) && inDeployRange(currAlt, maxDeploymentH, minDeploymentH) && currAlt < maxH) {
     Serial.println("------------- DEPLOYED (via main system) ----------------");
-    digitalWrite(led, HIGH);
-//    delay(5000);                // send current for 5 seconds
-//    while(1); 
+    digitalWrite(led, HIGH);    // REPLACE THIS WITH TRANSISTOR CODE
+    delay(5000);                // send current for 5 seconds
+    while(1);                   // BOOM we good
   }
 
-  // redundant system
+// ------------------------------------------------------------ END MAIN SYSTEM ---------------------------------------------------------------------
+
+
+
+//  ------------------------------------------------------------------ REDUNDANT SYSTEM ---------------------------------------------------------------------
   if (clock.seconds % sampleTime == 0 && initCall == false) {
     callTime = clock.seconds;
     initAlt = currAlt;
@@ -116,32 +120,29 @@ void loop() {
     
     Serial.print("Change in altitude: "); Serial.println(altChange(initAlt, finalAlt));
     
-    // verifies that the rocket has taken off (has been in the air)
-    if (altChange(initAlt, finalAlt) > 50) {        // this is a little sketchy because this is saying the change in altitude could be negative or positive, but I think it's fine
+    
+    if (altChange(initAlt, finalAlt) > 50) {  // verifies that the rocket has TAKEN OFF (has been in the air)
       enable = true;
-      digitalWrite(enableLED, HIGH);   
-      Serial.println("Enabled!!!");
+//      digitalWrite(enableLED, HIGH);   
+//      Serial.println("Enabled!!!");
     }
 
     if ( currAlt < minDeploymentH && currAlt < maxH && enable && decreasingH(currAlt, prevAlt)) {
-      digitalWrite(redundantLED, HIGH);                                                      // send out a current to ignite nichrome
-      delay(5000);                                                                  // for 5 seconds
+      digitalWrite(redundantLED, HIGH); // REPLACE THIS WITH TRANSISTOR SIGNAL
+      delay(5000);                                                                            // for 5 seconds
       Serial.println("------------- DEPLOYED (via redundant system) ----------------");
-      while(1);                                                                     // we're done boys
+      while(1);                                
     }
     initCall = false;
   }
-
     delay(250);
-    clock.incrementSecs();         // checks and increments count, increments seconds after 4 incremenets of count
- 
+    clock.incrementSecs();                     // checks and increments count, increments seconds after 4 incremenets of count
 }
 
-
-
+//  ---------------------------------------------------------- END REDUNDANT SYSTEM ---------------------------------------------------------------------
 void getInitialAlt(float& initAlt) {
   float A;
-  for (int i = 0; i < 5; i++) {               // sample the altitude 5 times to confirm it's stable
+  for (int i = 0; i < 5; i++) {                // sample the altitude 5 times to confirm it's stable
     A = baro.getAltitude();
   }
   initAlt = mToF(A);                           // return the altitude in feet
@@ -171,3 +172,4 @@ bool decreasingH(float currH, float prevH) {
 float altChange(float initAlt, float finalAlt) {
     return abs(finalAlt-initAlt);
 }
+
