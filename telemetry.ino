@@ -36,7 +36,7 @@ float finalAlt;                         // stores final alt sample of interval
 
 bool initCall = false;                  // stores if alt is initially sampled
 bool enable = false;                    // enables rocket to inflate payload (will only occur if Δalt > certain const)
-                                        // talk with propulsion about the const
+                                        
 bool inflated = false;                  // stores inflation status of payload
                                           
 MPU9250_DMP imu;                        // creates imu sensor object
@@ -45,10 +45,7 @@ Servo myservo;                          // creates servo object
 Time mainClock;                         // creates main clock/time that rocket runs on
     
 const int servo_pin = 11;               // output to the servo
-const int led_pin = 10;
-
 const int start_angle = 0;
-
 const int sampleTime = 1;
 
 // configuring the sensor and pins
@@ -58,7 +55,6 @@ void setup() {
   Serial.begin(115200);
   Wire.begin();
 
-//  pinMode(led_pin, OUTPUT);
   
  if (mySensor.beginI2C() == false) {    // Begin communication over I2C 
     Serial.println("The sensor did not respond. Please check wiring.");
@@ -95,48 +91,34 @@ void loop() {
   if ( imu.dataReady() ) {
     imu.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
     printIMUData(alt);
-//    serial.println(alt);
-//    serial.print("\t");
-//    serial.println(accelz);
-////    serial.print("\t");
-////    serial.print(accely);
-////    serial.print("\t");
-//    serial.println(gyroz);
-//    smallestAlt(alt, minAlt); 
-//    largestAlt(alt, maxAlt);
   }
 
   if (mainClock.seconds % sampleTime == 0 && initCall == false) {
     callTime = mainClock.seconds;
     initAlt = mySensor.readFloatAltitudeFeet();           // samples alt, storing it as initial alt
     initCall = true;                                      // declaring that initial height has been sampled so it doesnt repeat
-    }
+  }
 
   if (mainClock.seconds == (callTime + sampleTime) && initCall == true) {
     finalAlt = mySensor.readFloatAltitudeFeet();          // samples alt, storing it as final alt
     serial.print("Change in altitude: ");
     altChange(initAlt, finalAlt);
-    
-//    // verifies that the rocket has taken off (has been in the air)
-    if (altChange(initAlt, finalAlt) > 10) {
+
+    if (altChange(initAlt, finalAlt) > 50) {                  // verifies that the rocket has taken off (has been in the air)
       enable = true;
     }
-
-//     // call the servo to open the valve
-    if (altChange(initAlt, finalAlt) < 2 && enable) {
-      for(int angle = 0; angle <= 350; angle += 5) {      // command to move from 180 degrees to 0 degrees                             
-          myservo.write(angle);                           //command to rotate the servo to the specified angle
+   
+    if (altChange(initAlt, finalAlt) < 2 && enable) {         // open valve
+      for(int angle = 0; angle <= 350; angle += 5) {                 
+          myservo.write(angle);                     
           delay(50);
           inflated = true;               
         }
-//      digitalWrite(led_pin, HIGH);
-//      inflated == true;
-        if (inflated == true) {
-          delay(15000);                                   // after 15 seconds, will rotate the valve back, closing the C02
-          myservo.write(start_angle);
-          stop();                                         // ends entire program
-        }
+        delay(7500);                                          // wait 7.5s
+        myservo.write(start_angle);                           // close Valve
+        stop();                                               // end 
     }
+    
     initCall = false;
    }
     
