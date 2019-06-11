@@ -49,6 +49,10 @@ const int servo_pin = 11;               // output to the servo
 const int start_angle = 0;
 const int sampleTime = 1;
 
+bool firstRun = true;
+
+double initHeight;
+
 // configuring the sensor and pins
 void setup() {
   myservo.attach(servo_pin);
@@ -77,6 +81,11 @@ void setup() {
 
   imu.setLPF(5);          // Set LPF corner frequency to 5Hz
   imu.setSampleRate(10);  // Set sample rate to 10Hz
+
+  // sampling initial height
+  
+
+  
 }
 
 // ----------------------------------------------------------- END OF SETUP -----------------------------------------------------------
@@ -84,6 +93,15 @@ void setup() {
 // ----------------------------------------------------------- START OF LOOP ----------------------------------------------------------
 
 void loop() {
+  if (firstRun) {
+    // samples initial height 5 times
+    for (int i = 0; i < 5; i++){
+         initHeight = mySensor.readFloatAltitudeFeet();
+    }
+    firstRun = false;   // prevent it from running again
+  }
+
+//  serial.print("initial Altitude"); serial.println(initHeight);
   double alt;
   double accelz;
   double accely;
@@ -91,43 +109,49 @@ void loop() {
   
   if ( imu.dataReady() ) {
     imu.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
-    printIMUData(alt);
   }
 
   if (mainClock.seconds % sampleTime == 0 && initCall == false) {
     callTime = mainClock.seconds;
     initAlt = mySensor.readFloatAltitudeFeet();           // samples alt, storing it as initial alt
+//    serial.print("INITIAL height = "); serial.println(initAlt);
     initCall = true;                                      // declaring that initial height has been sampled so it doesnt repeat
   }
 
   if (mainClock.seconds == (callTime + sampleTime) && initCall == true) {
     finalAlt = mySensor.readFloatAltitudeFeet();          // samples alt, storing it as final alt
-    serial.print("Change in altitude: ");
-    altChange(initAlt, finalAlt);
-
+    serial.print("FINAL height = "); serial.println(finalAlt);
+    serial.print("Change in altitude: "); serial.println(altChange(initAlt, finalAlt));
+    
     if (altChange(initAlt, finalAlt) > 50) {                  // verifies that the rocket has taken off (has been in the air)
       enable = true;
     }
+    
     int totalAngle = 0;
-    if (altChange(initAlt, finalAlt) < 2 && enable) {         // open valve
+    if (altChange(initAlt, finalAlt) < 2 && enable && (finalAlt < (initHeight + 300))) {         // open valve
       for(int angle = 0; angle <= 350; angle += 5) {                 
           myservo.write(angle);                     
           delay(50);
           totalAngle += 5;
           inflated = true;               
         }
-        delay(7500);
+        delay(7500);    // wait 7.5 seconds
+
+       // close valve
        for (int angle = totalAngle; angle >= 0; angle -= 5) {
           myservo.write(angle);
           delay(50);
        }
-                                                  // wait 7.5s
-//        myservo.write(start_angle);                           // close Valve
+        serial.println("------------------ THE VALAVE IS CLOSED--------------------------------");                                       
         stop();                                               // end 
     }
     
     initCall = false;
    }
+
+   
+   mainClock.incrementSecs();
+   delay(mainClock.delay);    // uses the dalay preset in the time
     
 }
 
@@ -136,29 +160,9 @@ void loop() {
 // ----------------------------------------------------------- FUNCTION DEFs --------------------------------------------------------
 
 // initializes main rocket clock, samples and prints sensor data, every DELAY amount
-void printIMUData(double& alt) {  
-  mainClock.incrementSecs();
-  
-  float accelX = imu.calcAccel(imu.ax);
-  float accelY = imu.calcAccel(imu.ay);
-  float accelZ = imu.calcAccel(imu.az);
-  float gyroX = imu.calcGyro(imu.gx);
-  float gyroY = imu.calcGyro(imu.gy);
-  float gyroZ = imu.calcGyro(imu.gz);
-  float magX = imu.calcMag(imu.mx);
-  float magY = imu.calcMag(imu.my);
-  float magZ = imu.calcMag(imu.mz);
-  float humidity = mySensor.readFloatHumidity();
-  float pressure = mySensor.readFloatPressure();
-  float altitude = mySensor.readFloatAltitudeFeet();
-  float temp = mySensor.readTempF();
-  
-  delay(mainClock.delay);    // uses the dalay preset in the time
-}
 
 // calculates and returns difference between initial and final altitudes
 float altChange(float initAlt, float finalAlt) {
-    serial.println(abs(finalAlt-initAlt));
     return abs(finalAlt-initAlt);
 }
 
@@ -169,5 +173,5 @@ void stop()
  while(1);                  // calls an infinite loop
 }
 
-// ----------------------------------------------------------- END FUNCTION DEFs -----------------------------------------------------
 
+// ----------------------------------------------------------- END FUNCTION DEFs -----------------------------------------------------
