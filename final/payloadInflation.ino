@@ -44,24 +44,38 @@ BME280 mySensor;                        // creates altimeter sensor object
 Servo myservo;                          // creates servo object
 Time mainClock;                         // creates main clock/time that rocket runs on
 
-const int lockInput = 10;               // second armed mechanism
+const int lockInput = 10;               // input to second armed mechanism
 const int servo_pin = 11;               // output to the servo
+const int buzzer = 12;                  // output to buzzer
 const int start_angle = 0;
 const int sampleTime = 1;
 
 bool firstRun = true;
 bool lockEnable = false;
+bool prevInput;                         // stores previous input of the armed (true for HIGH false for LOW)
+
+long startTime;
+long highTime = 0; // counts how much time the input is HIGH consecutively
+long prevTime = 0;
 
 double initHeight;
 
 // configuring the sensor and pins
 void setup() {
+
+  Serial.begin(115200);
+  
   myservo.attach(servo_pin);
   myservo.write(start_angle);
-  Serial.begin(115200);
-  Wire.begin();
-
   
+  Wire.begin();
+  digitalWrite(lockInput, LOW);
+  pinMode(lockInput, INPUT);
+
+  digitalWrite(buzzer, LOW);
+  pinMode(buzzer, OUTPUT);
+  
+   
  if (mySensor.beginI2C() == false) {    // Begin communication over I2C 
     Serial.println("The sensor did not respond. Please check wiring.");
     while(1); //Freeze
@@ -83,9 +97,8 @@ void setup() {
   imu.setLPF(5);          // Set LPF corner frequency to 5Hz
   imu.setSampleRate(10);  // Set sample rate to 10Hz
 
-  // sampling initial height
   
-
+    startTime = millis();   // samples start time
   
 }
 
@@ -94,9 +107,15 @@ void setup() {
 // ----------------------------------------------------------- START OF LOOP ----------------------------------------------------------
 
 void loop() {
+//  digitalWrite(buzzer, LOW);
+  
+  if (lockEnable){
 
-  if (lockEnable) {
+    digitalWrite(buzzer, LOW);
+    serial.println("We;re inside main loop --------- program should end now");
+
     
+   // ------------------------------------------------- MAIN CODE -------------------------------------------------
     if (firstRun) {
     // samples initial height 5 times
     for (int i = 0; i < 5; i++){
@@ -146,7 +165,7 @@ void loop() {
           myservo.write(angle);
           delay(50);
        }
-        serial.println("------------------ THE VALAVE IS CLOSED--------------------------------");                                       
+        serial.println("------------------ THE VALVE IS CLOSED--------------------------------");                                       
         stop();                                               // end 
     }
     
@@ -157,14 +176,35 @@ void loop() {
    mainClock.incrementSecs();
    delay(mainClock.delay);    // uses the dalay preset in the time
     
-  } else {
-    // check if the lock has been enabled
-    if (digitalRead(lockInput) == HIGH) {
-      lockEnable = true;  
-    }  
-  
   }
 
+  else {
+//    serial.println("inside the else");
+      if (digitalRead(lockInput) == LOW) {
+          prevInput = false;  // the previous input was LOW
+        } else {
+          prevInput = true;   // the previous input was HIGH  
+        }
+        if (prevInput) {
+          
+          highTime  += (millis() - prevTime);
+//          serial.print("high time:  ");serial.println(highTime);
+         } else {
+          highTime = 0; // reset it back to 0; 
+//          serial.println("Disabled back to 0");
+         }
+
+         prevTime = millis();
+
+         if (highTime >= 2000) { // if we've been high for 10 seconds, SOUND IT!
+//           serial.println("ENABLE SOUND and lockEnable");
+           digitalWrite(buzzer, HIGH);
+           delay(5000);
+           lockEnable = true;
+         }
+         
+          
+   }
   
     
 }
@@ -189,5 +229,4 @@ void stop()
 
 
 // ----------------------------------------------------------- END FUNCTION DEFs -----------------------------------------------------
-
 
