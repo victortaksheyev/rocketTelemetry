@@ -1,3 +1,6 @@
+// included keyswitch code - need to test still
+
+
 #include <Wire.h>
 #include <Adafruit_MPL3115A2.h>
 
@@ -33,7 +36,16 @@ float initAlt;
 float finalAlt;
 bool enable = false;
 
-// global vars ---------------------------------------------------
+const int lockInput = 10;               // input to second armed mechanism
+const int buzzer = 12;                  // output to buzzer
+bool lockEnable = false;
+bool prevInput;
+
+long startTime;
+long highTime = 0; // counts how much time the input is HIGH consecutively
+long prevTime = 0;
+
+// end global vars ---------------------------------------------------
 
 
 class Time {
@@ -72,68 +84,105 @@ float altChange(float initAlt, float finalAlt);
 void setup() {
   Serial.begin(9600);
   pinMode(releaseSignal, OUTPUT);
+
+  digitalWrite(lockInput, LOW);
+  pinMode(lockInput, INPUT);
+  digitalWrite(buzzer, LOW);
+  pinMode(buzzer, OUTPUT);
+
+  startTime = millis();
 }
  
 void loop() {
-  if (! baro.begin()) {                           // not an option
-    Serial.println("Couldnt find sensor");
-    return;
-  } 
-  if (firstRun) {                                    // will only run 1 time
-    getInitialAlt(initH);  
-    firstRun = false;
-    prevAlt = -1;
-  } else {
-    prevAlt = currAlt;  
-  }
+
+  if (lockEnable) {
+      digitalWrite(buzzer, LOW);
+      Serial.println("We;re inside main loop --------- program should end now");
   
-  currAlt = mToF(baro.getAltitude()) - initH;
+      if (! baro.begin()) {                           // not an option
+        Serial.println("Couldnt find sensor");
+        return;
+      } 
+      if (firstRun) {                                    // will only run 1 time
+        getInitialAlt(initH);  
+        firstRun = false;
+        prevAlt = -1;
+      } else {
+        prevAlt = currAlt;  
+      }
+      
+      currAlt = mToF(baro.getAltitude()) - initH;
+    
+      getMax(currAlt, maxH);
+    
+    //  ------------------------------------------------------------------ MAIN SYSTEM ---------------------------------------------------------------------
+      if ( decreasingH(currAlt, prevAlt) && inDeployRange(currAlt, maxDeploymentH, minDeploymentH) && currAlt < maxH) {
+        Serial.println("------------- DEPLOYED (via main system) ----------------");
+        digitalWrite(releaseSignal, HIGH);    // REPLACE THIS WITH TRANSISTOR CODE
+        delay(delayTime);                // send current for 5 seconds
+        while(1);                   // BOOM we good
+      }
+    
+    // ------------------------------------------------------------ END MAIN SYSTEM ---------------------------------------------------------------------
+    
+    
+    
+    //  ------------------------------------------------------------------ REDUNDANT SYSTEM ---------------------------------------------------------------------
+      if (clock.seconds % sampleTime == 0 && initCall == false) {
+        callTime = clock.seconds;
+        initAlt = currAlt;
+        initCall = true;                                      // declaring that initial height has been sampled so it doesnt repeat
+        Serial.print("Initial alt sampled - ");Serial.println(initAlt);
+        }
+    
+    
+      if (clock.seconds == (callTime + sampleTime) && initCall == true) {
+        finalAlt = currAlt;
+        Serial.print("Final alt sampled - "); Serial.println(finalAlt);
+        
+        
+        Serial.print("Change in altitude: "); Serial.println(altChange(initAlt, finalAlt));
+        
+        
+        if (altChange(initAlt, finalAlt) > 50) {  // verifies that the rocket has TAKEN OFF (has been in the air)
+          enable = true;
+        }
+    
+        if ( currAlt < minDeploymentH && currAlt < maxH && enable && decreasingH(currAlt, prevAlt)) {
+          digitalWrite(releaseSignal, HIGH); // REPLACE THIS WITH TRANSISTOR SIGNAL
+          delay(delayTime);                                                                            // for 5 seconds
+          Serial.println("------------- DEPLOYED (via redundant system) ----------------");
+          while(1);                                
+        }
+        initCall = false;
+      }
+        delay(250);
+        clock.incrementSecs();                     // checks and increments count, increments seconds after 4 incremenets of count
 
-  getMax(currAlt, maxH);
+    } else {  // if lock is NOT enabled
+       if (digitalRead(lockInput) == LOW) {
+          prevInput = false;  // the previous input was LOW
+        } else {
+          prevInput = true;   // the previous input was HIGH  
+        }
+        if (prevInput) {
+          
+          highTime  += (millis() - prevTime);
+//          serial.print("high time:  ");serial.println(highTime);
+         } else {
+          highTime = 0; // reset it back to 0; 
+//          serial.println("Disabled back to 0");
+         }
 
-//  ------------------------------------------------------------------ MAIN SYSTEM ---------------------------------------------------------------------
-  if ( decreasingH(currAlt, prevAlt) && inDeployRange(currAlt, maxDeploymentH, minDeploymentH) && currAlt < maxH) {
-    Serial.println("------------- DEPLOYED (via main system) ----------------");
-    digitalWrite(releaseSignal, HIGH);    // REPLACE THIS WITH TRANSISTOR CODE
-    delay(delayTime);                // send current for 5 seconds
-    while(1);                   // BOOM we good
-  }
+         prevTime = millis();
 
-// ------------------------------------------------------------ END MAIN SYSTEM ---------------------------------------------------------------------
-
-
-
-//  ------------------------------------------------------------------ REDUNDANT SYSTEM ---------------------------------------------------------------------
-  if (clock.seconds % sampleTime == 0 && initCall == false) {
-    callTime = clock.seconds;
-    initAlt = currAlt;
-    initCall = true;                                      // declaring that initial height has been sampled so it doesnt repeat
-    Serial.print("Initial alt sampled - ");Serial.println(initAlt);
+         if (highTime >= 2000) { // if we've been high for 10 seconds, SOUND IT!
+//           serial.println("ENABLE SOUND and lockEnable");
+           digitalWrite(buzzer, HIGH);
+           delay(5000);
+           lockEnable = true;
+         }
     }
-
-
-  if (clock.seconds == (callTime + sampleTime) && initCall == true) {
-    finalAlt = currAlt;
-    Serial.print("Final alt sampled - "); Serial.println(finalAlt);
-    
-    
-    Serial.print("Change in altitude: "); Serial.println(altChange(initAlt, finalAlt));
-    
-    
-    if (altChange(initAlt, finalAlt) > 50) {  // verifies that the rocket has TAKEN OFF (has been in the air)
-      enable = true;
-    }
-
-    if ( currAlt < minDeploymentH && currAlt < maxH && enable && decreasingH(currAlt, prevAlt)) {
-      digitalWrite(releaseSignal, HIGH); // REPLACE THIS WITH TRANSISTOR SIGNAL
-      delay(delayTime);                                                                            // for 5 seconds
-      Serial.println("------------- DEPLOYED (via redundant system) ----------------");
-      while(1);                                
-    }
-    initCall = false;
-  }
-    delay(250);
-    clock.incrementSecs();                     // checks and increments count, increments seconds after 4 incremenets of count
 }
 
 //  ---------------------------------------------------------- END REDUNDANT SYSTEM ---------------------------------------------------------------------
@@ -169,4 +218,3 @@ bool decreasingH(float currH, float prevH) {
 float altChange(float initAlt, float finalAlt) {
     return abs(finalAlt-initAlt);
 }
-
