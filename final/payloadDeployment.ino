@@ -1,6 +1,3 @@
-// included keyswitch code - need to test still
-
-
 #include <Wire.h>
 #include <Adafruit_MPL3115A2.h>
 
@@ -17,8 +14,8 @@ Adafruit_MPL3115A2 baro = Adafruit_MPL3115A2();
 float initH = 0;
 float maxH = 0;
 bool firstRun = true;
-const int minDeploymentH = 850;                                   // feet
-const int maxDeploymentH = 1000;                                  // feet maybe change this to 1100
+const int minDeploymentH = 700;                                   // feet
+const int maxDeploymentH = 800;                                  // feet maybe change this to 1100
 float prevAlt = -1;
 float currAlt;
 bool noseConeDeployed = true;
