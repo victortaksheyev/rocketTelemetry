@@ -1,3 +1,6 @@
+// pre-flight RED SENSOR
+
+
 #include <SparkFunMPU9250-DMP.h>
 #include "SparkFunBME280.h"
 #include <Wire.h> //allows you to communicate with I2C devices
