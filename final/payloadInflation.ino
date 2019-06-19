@@ -1,5 +1,7 @@
-// pre-flight RED SENSOR
-
+// ------------------------------------------------------
+// PAYLOAD INFLATION (RED SENSOR)
+// UPLOAD TO RED SENSOR
+// ------------------------------------------------------
 
 #include <SparkFunMPU9250-DMP.h>
 #include "SparkFunBME280.h"
@@ -38,7 +40,9 @@ float initAlt;                          // stores init alt sample of interval
 float finalAlt;                         // stores final alt sample of interval
 
 bool initCall = false;                  // stores if alt is initially sampled
-bool enable = false;                    // enables rocket to inflate payload (will only occur if Δalt > certain const)
+bool firstEnable = false;
+bool secondEnable = false;
+bool mainEnable = false;                    // enables rocket to inflate payload (will only occur if Δalt > certain const)
                                         
 bool inflated = false;                  // stores inflation status of payload
                                           
@@ -53,6 +57,8 @@ const int buzzer = 12;                  // output to buzzer
 const int start_angle = 0;
 const int sampleTime = 1;
 
+//const int test_led = 12;
+
 bool firstRun = true;
 bool lockEnable = false;
 bool prevInput;                         // stores previous input of the armed (true for HIGH false for LOW)
@@ -60,6 +66,12 @@ bool prevInput;                         // stores previous input of the armed (t
 long startTime;
 long highTime = 0; // counts how much time the input is HIGH consecutively
 long prevTime = 0;
+
+const int finalInfaltionAngle = 45;     // 45 degrees
+const int delayBeforeClosing = 2300;    // wait 2.3 seconds before closing
+const int enable_velocity = 100;        // 100 ft/s
+
+
 
 double initHeight;
 
@@ -115,8 +127,6 @@ void loop() {
   if (lockEnable){
 
     digitalWrite(buzzer, LOW);
-    serial.println("We;re inside main loop --------- program should end now");
-
     
    // ------------------------------------------------- MAIN CODE -------------------------------------------------
     if (firstRun) {
@@ -124,6 +134,7 @@ void loop() {
     for (int i = 0; i < 5; i++){
          initHeight = mySensor.readFloatAltitudeFeet();
     }
+    
     firstRun = false;   // prevent it from running again
   }
 
@@ -146,22 +157,39 @@ void loop() {
 
   if (mainClock.seconds == (callTime + sampleTime) && initCall == true) {
     finalAlt = mySensor.readFloatAltitudeFeet();          // samples alt, storing it as final alt
-    serial.print("FINAL height = "); serial.println(finalAlt);
-    serial.print("Change in altitude: "); serial.println(altChange(initAlt, finalAlt));
+//    serial.print("FINAL height = "); serial.println(finalAlt);
+//    serial.print("Change in altitude: "); serial.println(altChange(initAlt, finalAlt));
+
+    serial.print("Absolute altitude: "); serial.println(finalAlt - initHeight);
+
+    if (altChange(initAlt, finalAlt) >= enable_velocity) {
+      firstEnable = true;  
+    }
+
+    if ((finalAlt - initHeight) >= 3000) {
+      secondEnable = true;
+    }
     
-    if (altChange(initAlt, finalAlt) > 50) {                  // verifies that the rocket has taken off (has been in the air)
-      enable = true;
+    if (firstEnable && secondEnable) { // we have taken off and traveled at least 3000 ft
+      mainEnable = true;
+    digitalWrite(buzzer, HIGH);
+    delay(100);
+    digitalWrite(buzzer, LOW);
+    delay(100);
+    digitalWrite(buzzer, HIGH);
+    delay(100);
     }
     
     int totalAngle = 0;
-    if (altChange(initAlt, finalAlt) < 2 && enable && (finalAlt < (initHeight + 300))) {         // open valve
-      for(int angle = 0; angle <= 350; angle += 5) {                 
+    if (altChange(initAlt, finalAlt) < 2 && mainEnable && (finalAlt < (initHeight + 300))) {         // open valve
+      for(int angle = 0; angle <= finalInfaltionAngle; angle += 5) {                 
           myservo.write(angle);                     
           delay(50);
           totalAngle += 5;
           inflated = true;               
         }
-        delay(7500);    // wait 7.5 seconds
+        
+        delay(delayBeforeClosing);    // wait 2.3 seconds
 
        // close valve
        for (int angle = totalAngle; angle >= 0; angle -= 5) {
@@ -191,6 +219,7 @@ void loop() {
         if (prevInput) {
           
           highTime  += (millis() - prevTime);
+//          highTime +=1;
 //          serial.print("high time:  ");serial.println(highTime);
          } else {
           highTime = 0; // reset it back to 0; 
@@ -204,12 +233,8 @@ void loop() {
            digitalWrite(buzzer, HIGH);
            delay(5000);
            lockEnable = true;
-         }
-         
-          
+         }      
    }
-  
-    
 }
 
 // ----------------------------------------------------------- END OF LOOP ----------------------------------------------------------
